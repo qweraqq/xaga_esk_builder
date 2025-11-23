@@ -84,52 +84,6 @@ git_clone() {
         "https://${host}/${repo}" -b "${branch}" "${dest}"
 }
 
-################################################################################
-# Telegram helpers
-################################################################################
-
-TG_NOTIFY="$(norm_bool "${TG_NOTIFY:-true}")"
-
-# Generate random build tags for Telegram
-BUILD_TAG="kernel_$(hexdump -v -e '/1 "%02x"' -n4 /dev/urandom)"
-info "Build tag generated: $BUILD_TAG"
-
-telegram_send_msg() {
-    local text=$1
-    local resp err
-
-    is_true "$TG_NOTIFY" || return 0
-
-    resp=$(curl -sX POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
-        -d chat_id="${TG_CHAT_ID}" \
-        -d parse_mode="MarkdownV2" \
-        -d disable_web_page_preview=true \
-        -d text="$text")
-
-    if ! echo "$resp" | jq -e '.ok == true' >/dev/null; then
-        err=$(echo "$resp" | jq -r '.description')
-        echo -e "${RED}[$(date '+%F %T')] [ERROR] telegram_send_msg(): ${err:-Unknown error}" >&2
-    fi
-}
-
-telegram_upload_file() {
-    local file="$1"
-    local caption="$2"
-    local resp err
-
-    is_true "$TG_NOTIFY" || return 0
-
-    resp=$(curl -sX POST -F document=@"$file" \
-        "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendDocument" \
-        -F "chat_id=${TG_CHAT_ID}" \
-        -F "parse_mode=MarkdownV2" \
-        -F "caption=$caption")
-
-    if ! echo "$resp" | jq -e '.ok == true' >/dev/null; then
-        err=$(echo "$resp" | jq -r '.description')
-        echo -e "${RED}[$(date '+%F %T')] [ERROR] telegram_upload_file(): ${err:-Unknown error}" >&2
-    fi
-}
 
 ################################################################################
 # Error handling
@@ -150,7 +104,6 @@ $(escape_md_v2 "ERROR: $*")
 EOF
     )
 
-    telegram_upload_file "$LOGFILE" "$msg"
     exit 1
 }
 
@@ -163,11 +116,8 @@ trap 'error "Build failed at line $LINENO: $BASH_COMMAND"' ERR
 # General
 KERNEL_NAME="ESK"
 KERNEL_DEFCONFIG="gki_defconfig"
-KBUILD_BUILD_USER="builder"
-KBUILD_BUILD_HOST="esk"
-TIMEZONE="Asia/Ho_Chi_Minh"
-RELEASE_REPO="ESK-Project/esk-releases"
-RELEASE_BRANCH="main"
+KBUILD_BUILD_USER="build-user"
+KBUILD_BUILD_HOST="build-host"
 
 # --- Kernel flavour
 # KernelSU variant: NONE | OFFICIAL | NEXT | SUKI
@@ -188,32 +138,21 @@ JOBS="$(nproc --all)"
 WORKSPACE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KERNEL_PATCHES="$WORKSPACE/kernel_patches"
 CLANG="$WORKSPACE/clang"
-CLANG_BIN="$CLANG/bin"
+CLANG_BIN="$CLANG/clang-r536225/bin"
 SIGN_KEY="$WORKSPACE/key"
 OUT_DIR="$WORKSPACE/out"
 LOGFILE="$WORKSPACE/build.log"
-BOOT_IMAGE="$WORKSPACE/boot_image"
 BOOT_SIGN_KEY="$SIGN_KEY/boot_sign_key.pem"
 
 # --- Sources (host:owner/repo@ref)
-KERNEL_REPO="github.com:ESK-Project/android_kernel_xiaomi_mt6895@16"
+KERNEL_REPO="github.com:qweraqq/android_kernel_xiaomi_mt6895@ksu-susfs"
 KERNEL="$WORKSPACE/kernel"
 ANYKERNEL_REPO="github.com:ESK-Project/AnyKernel3@android12-5.10"
 ANYKERNEL="$WORKSPACE/anykernel3"
 GKI_URL="https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-2025-09_r1.zip"
-BUILD_TOOLS_REPO="android.googlesource.com:kernel/prebuilts/build-tools@main-kernel-build-2024"
-BUILD_TOOLS="$WORKSPACE/build-tools"
-MKBOOTIMG_REPO="android.googlesource.com:platform/system/tools/mkbootimg@main-kernel-build-2024"
-MKBOOTIMG="$WORKSPACE/mkbootimg"
+
 
 KERNEL_OUT="$KERNEL/out"
-
-# --- Make arguments
-MAKE_ARGS=(
-    -j"$JOBS" O="$KERNEL_OUT" ARCH="arm64"
-    CC="ccache clang" CROSS_COMPILE="aarch64-linux-gnu-"
-    LLVM="1" LD="$CLANG_BIN/ld.lld"
-)
 
 ################################################################################
 # Initialize build environment
@@ -271,50 +210,9 @@ clang_lto() {
 # Build steps
 ################################################################################
 
-init_logging() {
-    exec > >(tee >(sed -u -r 's/\033\[[0-9;]*[A-Za-z]//g' >"$LOGFILE")) 2>&1
-}
-
-validate_env() {
-    info "Validating environment variables..."
-    : "${GH_TOKEN:?Required GitHub PAT missing: GH_TOKEN}"
-    if is_true "$TG_NOTIFY"; then
-        : "${TG_BOT_TOKEN:?Required Telegram Bot Token missing: TG_BOT_TOKEN}"
-        : "${TG_CHAT_ID:?Required chat ID missing: TG_CHAT_ID}"
-    fi
-}
-
-send_start_msg() {
-    local ksu_included="true"
-    [[ $KSU == "NONE" ]] && ksu_included="false"
-
-    local start_msg
-    start_msg=$(
-        cat <<EOF
-*$(escape_md_v2 "$KERNEL_NAME Kernel Build Started!")*
-
-*Tags*: \#$(escape_md_v2 "$BUILD_TAG")
-
-*Build info*
-├ Builder: $(escape_md_v2 "$KBUILD_BUILD_USER@$KBUILD_BUILD_HOST")
-├ Defconfig: $(escape_md_v2 "$KERNEL_DEFCONFIG")
-└ Jobs: $(escape_md_v2 "$JOBS")
-
-*Build options*
-├ KernelSU: $(escape_md_v2 "$(parse_bool "$ksu_included") | $KSU")
-├ SuSFS: $(parse_bool "$SUSFS")
-├ BBG: $(parse_bool "$BBG")
-└ LXC: $(parse_bool "$LXC")
-EOF
-    )
-    telegram_send_msg "$start_msg"
-}
-
 prepare_dirs() {
     RESET_DIR_LIST=(
-        "$KERNEL" "$ANYKERNEL" "$BUILD_TOOLS"
-        "$MKBOOTIMG" "$OUT_DIR" "$BOOT_IMAGE"
-        "$WORKSPACE/susfs" "$WORKSPACE/wild_patches"
+        "$KERNEL" "$OUT_DIR" "$WORKSPACE/susfs" "$WORKSPACE/wild_patches"
     )
     info "Resetting directories: ${RESET_DIR_LIST[*]}"
     for dir in "${RESET_DIR_LIST[@]}"; do
@@ -325,59 +223,19 @@ prepare_dirs() {
 fetch_sources() {
     info "Cloning kernel source..."
     git_clone "$KERNEL_REPO" "$KERNEL"
-
-    info "Cloning AnyKernel3..."
-    git_clone "$ANYKERNEL_REPO" "$ANYKERNEL"
-
-    info "Cloning build tools..."
-    git_clone "$BUILD_TOOLS_REPO" "$BUILD_TOOLS"
-    git_clone "$MKBOOTIMG_REPO" "$MKBOOTIMG"
 }
 
 setup_toolchain() {
     info "Fetching AOSP Clang toolchain"
-    local clang_url
-    clang_url=$(curl -fsSL "https://api.github.com/repos/bachnxuan/aosp_clang_mirror/releases/latest" \
-        -H "Authorization: Bearer $GH_TOKEN" \
-        | grep "browser_download_url" \
-        | grep ".tar.gz" \
-        | cut -d '"' -f 4)
-
     mkdir -p "$CLANG"
-
-    local attempt=0
-    local retries=5
-    local aria_opts=(
-        -q -c -x16 -s16 -k8M
-        --file-allocation=falloc --check-certificate=false
-        -d "$WORKSPACE" -o "clang-archive" "$clang_url"
-    )
-
-    while ((attempt < retries)); do
-        if aria2c "${aria_opts[@]}"; then
-            success "Clang download successful!"
-            break
-        else
-            warn "Clang download attempt $attempt failed, retrying..."
-            ((attempt++))
-            sleep 5
-        fi
-    done
-
-    if ((attempt == retries)); then
-        error "Clang download failed after $retries attempts!"
-    fi
-
-    tar -xzf "$WORKSPACE/clang-archive" -C "$CLANG"
-    rm -f "$WORKSPACE/clang-archive"
-
+    git clone --branch llvm-r536225-release --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 $CLANG
     export PATH="${CLANG_BIN}:$PATH"
-
+    
     COMPILER_STRING="$("$CLANG_BIN/clang" -v 2>&1 | head -n 1 | sed 's/(https..*//')"
-    KBUILD_BUILD_TIMESTAMP="$(date +"%a %d %b %H:%M")"
-    export KBUILD_BUILD_TIMESTAMP
-    export KBUILD_BUILD_USER
-    export KBUILD_BUILD_HOST
+    export KBUILD_BUILD_USER=build-user
+    export KBUILD_BUILD_HOST=build-host
+    export KBUILD_BUILD_TIMESTAMP="Wed Aug 28 22:16:09 UTC 2024"
+    KBUILD_BUILD_TIMESTAMP="Wed Aug 28 22:16:09 UTC 2024"
 }
 
 apply_susfs() {
@@ -497,6 +355,18 @@ prebuild_kernel() {
         config --enable CONFIG_BBG
         success "Added BBG"
     fi
+
+    # Core BPF Support
+    config --enable CONFIG_BPF
+    config --enable CONFIG_BPF_SYSCALL
+    config --enable CONFIG_BPF_JIT
+    # BTF / CO-RE Support (Requires 'dwarves' package installed above)
+    config --enable CONFIG_DEBUG_INFO_BTF
+    # BPF LTS/Tracing features
+    config --enable CONFIG_BPF_EVENTS
+    config --enable CONFIG_BPF_STREAM_PARSER
+    config --enable CONFIG_CGROUP_BPF
+    config --enable CONFIG_LWTUNNEL_BPF
 }
 
 build_kernel() {
@@ -505,191 +375,20 @@ build_kernel() {
     SECONDS=0
 
     info "Generate defconfig: $KERNEL_DEFCONFIG"
-    make "${MAKE_ARGS[@]}" "$KERNEL_DEFCONFIG" >/dev/null 2>&1
+    make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 LD="$CLANG_BIN/ld.lld" O=out gki_defconfig
     success "Defconfig generated"
 
-    clang_lto "$CLANG_LTO"
+    THREAD="-j$(nproc --all)"
+    make CC=clang LLVM=1 LLVM_IAS=1 CROSS_COMPILE=aarch64-linux-gnu- O=out LD="$CLANG_BIN/ld.lld" $THREAD \
+        LOCALVERSION=-android12-9-00019-g4ea09a298bb4-ab12292661 \
+        CONFIG_LOCALVERSION_AUTO=n \
+        CONFIG_MEDIATEK_CPUFREQ_DEBUG=m CONFIG_MTK_IPI=m CONFIG_MTK_TINYSYS_MCUPM_SUPPORT=m \
+        CONFIG_MTK_MBOX=m CONFIG_RPMSG_MTK=m CONFIG_LTO_CLANG=y CONFIG_LTO_NONE=n \
+        CONFIG_LTO_CLANG_THIN=y CONFIG_LTO_CLANG_FULL=n
 
-    make "${MAKE_ARGS[@]}" Image
     success "Kernel built successfully"
 
     KERNEL_VERSION=$(make -s kernelversion | cut -d- -f1)
-}
-
-kpm_patcher() {
-    if [[ $KSU == "SUKI" ]]; then
-        info "Patching KPM for SukiSU variant..."
-        tmp="$(mktemp -d)" && cd "$tmp"
-        cp -p "$KERNEL_OUT/arch/arm64/boot/Image" "$tmp"/
-
-        KPM_PATCHER="https://github.com/SukiSU-Ultra/SukiSU_patch/raw/refs/heads/main/kpm/patch_linux"
-        curl -fsSL "$KPM_PATCHER" -o patch_linux
-
-        chmod +x ./patch_linux
-        ./patch_linux >/dev/null 2>&1
-
-        [[ -f oImage ]] || error "patch_linux failed to produce patched Image"
-        mv oImage "$ANYKERNEL/Image"
-
-        # Clean-up
-        rm -rf ./patch_linux
-        cd "$ANYKERNEL"
-        rm -rf "$tmp"
-        success "Patched KPM for SukiSU variant"
-    else
-        cp -p "$KERNEL_OUT/arch/arm64/boot/Image" "$ANYKERNEL"/
-    fi
-}
-
-package_anykernel() {
-    local package_name="$1"
-
-    info "Packaging AnyKernel3 zip..."
-    pushd "$ANYKERNEL" >/dev/null
-
-    # Patch KPM for SukiSU variant
-    # kpm_patcher() will copy the Image to AnyKernel folder
-    kpm_patcher
-
-    info "Compressing kernel image..."
-    zstd -19 -T0 --no-progress -o Image.zst Image >/dev/null 2>&1
-    rm -f ./Image
-    sha256sum Image.zst >Image.zst.sha256
-
-    info "[UPX] Compressing AnyKernel3 static binaries..."
-    local UPX_LIST=(
-        tools/zstd
-        tools/fec
-        tools/httools_static
-        tools/lptools_static
-        tools/magiskboot
-        tools/magiskpolicy
-        tools/snapshotupdater_static
-    )
-    for binary in "${UPX_LIST[@]}"; do
-        local file="$ANYKERNEL/$binary"
-        [[ -f $file ]] || {
-            warn "[UPX] Binary not found: $binary"
-            continue
-        }
-        if upx -9 --lzma --no-progress "$file" >/dev/null 2>&1; then
-            success "[UPX] Compressed: $(basename "$binary")"
-        else
-            warn "[UPX] Failed: $(basename "$binary")"
-        fi
-    done
-
-    zip -r9q -T -X -y -n .zst "$OUT_DIR/$package_name-AnyKernel3.zip" . -x '.git/*' '*.log'
-
-    popd >/dev/null
-    success "AnyKernel3 packaged"
-}
-
-package_bootimg() {
-    local package_name="$1"
-    info "Packaging boot image..."
-
-    pushd "$BOOT_IMAGE" >/dev/null
-
-    cp -p "$KERNEL_OUT/arch/arm64/boot/Image" ./Image
-    gzip -n -f -9 Image
-
-    curl -fsSLo gki-kernel.zip "$GKI_URL"
-    unzip gki-kernel.zip >/dev/null 2>&1 && rm gki-kernel.zip
-
-    "$MKBOOTIMG/unpack_bootimg.py" --boot_img="boot-5.10.img"
-    "$MKBOOTIMG/mkbootimg.py" \
-        --header_version 4 \
-        --kernel Image.gz \
-        --output boot.img \
-        --ramdisk out/ramdisk \
-        --os_version 12.0.0 \
-        --os_patch_level "2099-12"
-
-    "$BUILD_TOOLS/linux-x86/bin/avbtool" add_hash_footer \
-        --partition_name boot \
-        --partition_size $((64 * 1024 * 1024)) \
-        --image boot.img \
-        --algorithm SHA256_RSA4096 \
-        --key "$BOOT_SIGN_KEY"
-
-    cp "$BOOT_IMAGE/boot.img" "$OUT_DIR/$package_name-boot.img"
-
-    popd >/dev/null
-}
-
-write_metadata() {
-    local package_name="$1"
-    cat >"$WORKSPACE/github.env" <<EOF
-kernel_version=$KERNEL_VERSION
-kernel_name=$KERNEL_NAME
-toolchain=$COMPILER_STRING
-build_date=$KBUILD_BUILD_TIMESTAMP
-package_name=$package_name
-susfs_version=$SUSFS_VERSION
-variant=$VARIANT
-name=$KERNEL_NAME
-out_dir=$OUT_DIR
-release_repo=$RELEASE_REPO
-release_branch=$RELEASE_BRANCH
-EOF
-}
-
-notify_success() {
-    local final_package="$1"
-    local build_time="$2"
-    # For indicating build variant (AnyKernel3, Boot Image)
-    local additional_tag="$3"
-
-    local minutes=$((build_time / 60))
-    local seconds=$((build_time % 60))
-
-    local result_caption
-    result_caption=$(
-        cat <<EOF
-*$(escape_md_v2 "$KERNEL_NAME Build Successfully!")*
-
-*Tags*: \#$(escape_md_v2 "$BUILD_TAG") \#$(escape_md_v2 "$additional_tag")
-
-*Build*
-├ Builder: $(escape_md_v2 "$KBUILD_BUILD_USER@$KBUILD_BUILD_HOST")
-├ Build time: $(escape_md_v2 "${minutes}m ${seconds}s")
-└ Build date: $(escape_md_v2 "$KBUILD_BUILD_TIMESTAMP")
-
-*Kernel*
-├ Linux version: $(escape_md_v2 "$KERNEL_VERSION")
-└ Compiler: $(escape_md_v2 "$COMPILER_STRING")
-
-*Options*
-├ KernelSU: $(escape_md_v2 "$KSU")
-├ SuSFS: $(is_true "$SUSFS" && escape_md_v2 "$SUSFS_VERSION" || echo "Disabled")
-├ BBG: $(parse_bool "$BBG")
-└ LXC: $(parse_bool "$LXC")
-
-*Artifact*
-├ Name: $(escape_md_v2 "$(basename "$final_package")")
-└ Size: $(escape_md_v2 "$(du -h "$final_package" | cut -f1)")
-EOF
-    )
-
-    telegram_upload_file "$final_package" "$result_caption"
-    success "Build succeeded in ${minutes}m ${seconds}s"
-}
-
-telegram_notify() {
-    local build_time="$SECONDS"
-
-    # AnyKernel3
-    local ak3_package="$OUT_DIR/$PACKAGE_NAME-AnyKernel3.zip"
-    notify_success "$ak3_package" "$build_time" "anykernel3"
-
-    # Boot image
-    pushd "$OUT_DIR" >/dev/null
-    zip -9q -T "$PACKAGE_NAME-boot.zip" "$PACKAGE_NAME-boot.img"
-    popd >/dev/null
-
-    notify_success "$OUT_DIR/$PACKAGE_NAME-boot.zip" "$build_time" "boot_image"
-    rm -f "$OUT_DIR/$PACKAGE_NAME-boot.zip"
 }
 
 ################################################################################
@@ -697,9 +396,6 @@ telegram_notify() {
 ################################################################################
 
 main() {
-    init_logging
-    validate_env
-    send_start_msg
     prepare_dirs
     fetch_sources
     setup_toolchain
@@ -713,16 +409,7 @@ main() {
     is_true "$BBG" && VARIANT+="-BBG"
     PACKAGE_NAME="$KERNEL_NAME-$KERNEL_VERSION-$VARIANT"
 
-    # Build flashable package
-    package_anykernel "$PACKAGE_NAME"
-    package_bootimg "$PACKAGE_NAME"
-
-    # Github Actions metadata
-    write_metadata "$PACKAGE_NAME"
-
-    if is_true "$TG_NOTIFY"; then
-        telegram_notify
-    fi
+    cp -p "$KERNEL_OUT/arch/arm64/boot/Image" "$OUT_DIR/$package_name.Image"
 }
 
 main "$@"
