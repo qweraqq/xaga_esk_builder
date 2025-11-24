@@ -226,9 +226,7 @@ fetch_sources() {
 }
 
 setup_toolchain() {
-    info "Fetching AOSP Clang toolchain"
-    mkdir -p "$CLANG"
-    git clone --branch llvm-r536225-release --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 $CLANG
+    info "Setting up AOSP Clang toolchain"
     export PATH="${CLANG_BIN}:$PATH"
     
     COMPILER_STRING="$("$CLANG_BIN/clang" -v 2>&1 | head -n 1 | sed 's/(https..*//')"

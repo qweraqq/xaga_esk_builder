@@ -99,6 +99,25 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -qq \
             bc bison curl flex git tar wget aria2 jq zip zstd upx build-essential dwarves libdw-dev libdwarf-dev libelf-dev zlib1g-dev libbpf-dev libssl-dev libncurses-dev libcap-dev libz-dev pkg-config
+          sudo apt-get clean && sudo apt-get autoclean
+          sudo apt-get autoremove -y
+
+      - name: Cache Clang
+        id: cache-tools
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/work/xaga_esk_builder/xaga_esk_builder/clang/
+          key: ${{ runner.os }}-custom-tools-v1
+
+      - name: Install Clang via Git
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /home/runner/work/xaga_esk_builder/xaga_esk_builder/
+          git clone --branch llvm-r536225-release --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 /home/runner/work/xaga_esk_builder/xaga_esk_builder/clang
+          rm -rf /home/runner/work/xaga_esk_builder/xaga_esk_builder/clang/clang-3289846
+          rm -rf /home/runner/work/xaga_esk_builder/xaga_esk_builder/clang/clang-r522817
+          rm -rf /home/runner/work/xaga_esk_builder/xaga_esk_builder/clang/clang-r530567
+          rm -rf /home/runner/work/xaga_esk_builder/xaga_esk_builder/clang/.git
 
       - name: Build
         id: build
@@ -115,5 +134,5 @@ jobs:
       - name: Upload kernel image artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.build.outputs.name }}-${{ steps.build.outputs.variant }}-kernel-image
-          path: ${{ steps.build.outputs.out_dir }}/${{ steps.build.outputs.package_name }}.Image
+          name: boot-Image
+          path: /home/runner/work/xaga_esk_builder/xaga_esk_builder/kernel/out/arch/arm64/boot/Image
