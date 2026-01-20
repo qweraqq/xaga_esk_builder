@@ -145,7 +145,7 @@ LOGFILE="$WORKSPACE/build.log"
 BOOT_SIGN_KEY="$SIGN_KEY/boot_sign_key.pem"
 
 # --- Sources (host:owner/repo@ref)
-KERNEL_REPO="github.com:qweraqq/android_kernel_xiaomi_mt6895@ksu-susfs"
+KERNEL_REPO="github.com:qweraqq/android_kernel_xiaomi_mt6895@v2.9-ksu-susfs"
 KERNEL="$WORKSPACE/kernel"
 ANYKERNEL_REPO="github.com:ESK-Project/AnyKernel3@android12-5.10"
 ANYKERNEL="$WORKSPACE/anykernel3"
@@ -232,8 +232,9 @@ setup_toolchain() {
     COMPILER_STRING="$("$CLANG_BIN/clang" -v 2>&1 | head -n 1 | sed 's/(https..*//')"
     export KBUILD_BUILD_USER=build-user
     export KBUILD_BUILD_HOST=build-host
-    export KBUILD_BUILD_TIMESTAMP="Wed Aug 28 22:16:09 UTC 2024"
-    KBUILD_BUILD_TIMESTAMP="Wed Aug 28 22:16:09 UTC 2024"
+    # getprop ro.build.date
+    export KBUILD_BUILD_TIMESTAMP="Tue Oct 14 11:53:18 UTC 2025"
+    KBUILD_BUILD_TIMESTAMP="Tue Oct 14 11:53:18 UTC 2025"
 }
 
 apply_susfs() {
@@ -376,9 +377,10 @@ build_kernel() {
     make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 LD="$CLANG_BIN/ld.lld" O=out gki_defconfig
     success "Defconfig generated"
 
+    # uname -r
     THREAD="-j$(nproc --all)"
     make CC=clang LLVM=1 LLVM_IAS=1 CROSS_COMPILE=aarch64-linux-gnu- O=out LD="$CLANG_BIN/ld.lld" $THREAD \
-        LOCALVERSION=-android12-9-00019-g4ea09a298bb4-ab12292661 \
+        LOCALVERSION=-android12-9-00047-g4968e29b7f92-ab12786767 \
         CONFIG_LOCALVERSION_AUTO=n \
         CONFIG_MEDIATEK_CPUFREQ_DEBUG=m CONFIG_MTK_IPI=m CONFIG_MTK_TINYSYS_MCUPM_SUPPORT=m \
         CONFIG_MTK_MBOX=m CONFIG_RPMSG_MTK=m CONFIG_LTO_CLANG=y CONFIG_LTO_NONE=n \
