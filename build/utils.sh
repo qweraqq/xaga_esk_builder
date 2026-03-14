@@ -50,9 +50,9 @@ is_true() {
 
 parse_bool() {
     if is_true "$1"; then
-        echo "Enabled"
+        echo "on"
     else
-        echo "Disabled"
+        echo "off"
     fi
 }
 
