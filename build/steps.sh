@@ -321,8 +321,18 @@ package_bootimg() {
 write_metadata() {
     step 12 "Write metadata"
 
+    META_PY="$WORKSPACE/py/meta.py"
+    META_FILE="$WORKSPACE/github.json"
+
     local package_name="$1"
-    github_write_metadata "$package_name"
+    local anykernel_zip="$package_name-AnyKernel3.zip"
+    local boot_image="$package_name-boot.img"
+
+    python3 "$META_PY" \
+        "$META_FILE" \
+        "$KERNEL_VERSION" "$KERNEL_NAME" "$COMPILER_STRING" \
+        "$package_name" "$VARIANT" "$KERNEL_NAME" "$OUT_DIR" \
+        "$RELEASE_REPO" "$RELEASE_BRANCH" "$anykernel_zip" "$boot_image"
 }
 
 notify_success() {
