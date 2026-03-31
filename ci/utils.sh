@@ -6,7 +6,7 @@
 
 init_logging() {
     # Clean logfile before writing
-    : >"$LOGFILE"
+    : > "$LOGFILE"
 
     exec > >(tee -a "$LOGFILE") 2>&1
     step "Init logging"
@@ -17,7 +17,7 @@ send_start_msg() {
 
     local start_msg
     start_msg=$(
-        cat <<EOF
+        cat << EOF
 🚧 *$(escape_md_v2 "$KERNEL_NAME Kernel Build Started!")*
 
 🏷️ \#$(escape_md_v2 "$BUILD_TAG")
@@ -52,7 +52,7 @@ error() {
 
     local msg
     msg=$(
-        cat <<EOF
+        cat << EOF
 ❌ *$(escape_md_v2 "$KERNEL_NAME Kernel CI")*
 
 🏷️ *Tags*: \#$(escape_md_v2 "$BUILD_TAG") \#error
