@@ -145,7 +145,7 @@ LOGFILE="$WORKSPACE/build.log"
 BOOT_SIGN_KEY="$SIGN_KEY/boot_sign_key.pem"
 
 # --- Sources (host:owner/repo@ref)
-KERNEL_REPO="github.com:qweraqq/android_kernel_xiaomi_mt6895@v2.9-ksu-susfs"
+KERNEL_REPO="github.com:qweraqq/android_kernel_xiaomi_mt6895@v3.0-ksu-susfs"
 KERNEL="$WORKSPACE/kernel"
 ANYKERNEL_REPO="github.com:ESK-Project/AnyKernel3@android12-5.10"
 ANYKERNEL="$WORKSPACE/anykernel3"
