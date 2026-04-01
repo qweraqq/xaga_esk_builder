@@ -58,7 +58,7 @@ case "$BUILD_TARGET" in
         BOOT_MODE="single"
         ;;
     generic)
-        KERNEL_REPO="github.com:ESK-Project/android12-5.10-gki@${BRANCH_OVERRIDE:-main}"
+        KERNEL_REPO="github.com:ESK-Project/android12-5.10-gki@${BRANCH_OVERRIDE:-rebase}"
         AK3_REPO="github.com:ESK-Project/AnyKernel3@generic"
         RELEASE_REPO="ESK-Project/gki-releases"
         BOOT_MODE="multi"
