@@ -20,25 +20,37 @@ pulls sources and tools, applies optional patches, then builds and packages the 
 ubuntu/debian:
 
 ```bash
-sudo apt install bc bison ccache curl flex git tar wget aria2 jq zip zstd upx build-essential python3-requests libfaketime lz4
+sudo apt install bc bison ccache curl flex git tar wget aria2 jq zip zstd upx build-essential python3-requests libfaketime lz4 just
 ````
 
 fedora:
 
 ```bash
-sudo dnf install bc bison ccache curl flex git tar wget aria2 jq zip zstd upx make python3-requests libfaketime lz4
+sudo dnf install bc bison ccache curl flex git tar wget aria2 jq zip zstd upx make python3-requests libfaketime lz4 just
 ```
 
 ## run
 
 ```bash
-./build.sh
+just build
 ```
 
 example:
 
 ```bash
-BUILD_TARGET=xaga KSU=true SUSFS=true LXC=false ./build.sh
+just xaga KSU=true SUSFS=true LXC=false
+```
+
+format script:
+
+```bash
+just fmt
+```
+
+clean build:
+
+```bash
+just clean
 ```
 
 ## inputs
@@ -60,6 +72,7 @@ BUILD_TARGET=xaga KSU=true SUSFS=true LXC=false ./build.sh
 
 notes:
 
+- bool accepts true/false, t/f, yes/no, y/n, on/off, 1/0
 - SUSFS needs KSU=true
 - LXC only works with BUILD_TARGET=xaga
 - TG_NOTIFY=true needs TG_BOT_TOKEN and TG_CHAT_ID
