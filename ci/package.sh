@@ -26,8 +26,12 @@ package_anykernel() {
     rm -f ./Image
     sha256sum Image.zst > Image.zst.sha256
 
+    info "Cleaning up AK3..."
+    find . -type f -name 'placeholder' -delete
+    find . -mindepth 1 -depth -type d -empty -delete
+
     rm -f "$package_path"
-    zip -r9q -T -X -y -n .zst "$package_path" . -x '.git/*' '*.log'
+    zip -r9q -T -X -y -n .zst "$package_path" . -x '.git/*' '*.log' '.github/*' 'README.md'
 
     popd > /dev/null
     success "AnyKernel3 packaged"
