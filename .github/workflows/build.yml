@@ -89,7 +89,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -qq \
-            bc bison ccache curl flex git tar wget aria2 jq zip zstd upx build-essential python3-requests libfaketime lz4
+            bc bison ccache curl flex git tar wget aria2 jq zip zstd upx build-essential python3-requests libfaketime lz4 just
 
       - name: Compute ccache key
         run: |
@@ -116,8 +116,7 @@ jobs:
           STOCK_CONFIG: ${{ inputs.STOCK_CONFIG }}
           TG_NOTIFY: ${{ inputs.TG_NOTIFY }}
         run: |
-          chmod +x build.sh
-          ./build.sh
+          just build
 
           file="$GITHUB_WORKSPACE/github.json"
           [[ -f "$file" ]] || { echo "::error::github.json missing"; exit 1; }

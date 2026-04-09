@@ -4,10 +4,12 @@ on:
   pull_request:
     paths:
       - "**/*.sh"
+      - "justfile"
       - ".github/workflows/check.yml"
   push:
     paths:
       - "**/*.sh"
+      - "justfile"
       - ".github/workflows/check.yml"
   workflow_dispatch:
 
@@ -22,16 +24,7 @@ jobs:
       - name: Install shell tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck shfmt
+          sudo apt-get install -y just shellcheck shfmt
 
-      - name: Run shellcheck
-        shell: bash
-        run: |
-          mapfile -t scripts < <(git ls-files '*.sh')
-          shellcheck -x "${scripts[@]}"
-
-      - name: Check shell formatting
-        shell: bash
-        run: |
-          mapfile -t scripts < <(git ls-files '*.sh')
-          shfmt -d -i 4 -ci -bn -sr "${scripts[@]}"
+      - name: Run checks
+        run: just check

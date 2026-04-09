@@ -47,6 +47,12 @@ format script:
 just fmt
 ```
 
+run checks:
+
+```bash
+just check
+```
+
 clean build:
 
 ```bash
