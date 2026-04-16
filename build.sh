@@ -80,7 +80,7 @@ git_clone() {
     local dest="$2"
     local host repo branch
     IFS=':@' read -r host repo branch <<<"$source"
-    git clone -q --depth=1 --single-branch --no-tags \
+    git clone -q --depth=1 --single-branch --no-tags --recurse-submodules \
         "https://${host}/${repo}" -b "${branch}" "${dest}"
 }
 
@@ -145,7 +145,7 @@ LOGFILE="$WORKSPACE/build.log"
 BOOT_SIGN_KEY="$SIGN_KEY/boot_sign_key.pem"
 
 # --- Sources (host:owner/repo@ref)
-KERNEL_REPO="github.com:qweraqq/android_kernel_xiaomi_mt6895@v2.9-ksu-susfs"
+KERNEL_REPO="github.com:qweraqq/android_kernel_xiaomi_mt6895@main"
 KERNEL="$WORKSPACE/kernel"
 ANYKERNEL_REPO="github.com:ESK-Project/AnyKernel3@android12-5.10"
 ANYKERNEL="$WORKSPACE/anykernel3"
@@ -308,26 +308,8 @@ prebuild_kernel() {
 
     if is_true "$ksu_included"; then
         info "Setup KernelSU"
-        case "$KSU" in
-            OFFICIAL) install_ksu tiann/KernelSU main ;;
-            NEXT) install_ksu KernelSU-Next/KernelSU-Next next ;;
-            SUKI)
-                install_ksu SukiSU-Ultra/SukiSU-Ultra "$(is_true "$SUSFS" && echo "susfs-main" || echo "main")"
-                ;;
-        esac
-
         info "Configuring KernelSU"
         config --enable CONFIG_KSU
-
-        if [[ $KSU == "SUKI" ]]; then
-            patch -s -p1 --fuzz=3 --no-backup-if-mismatch <"$KERNEL_PATCHES/suki/manual_hooks.patch"
-            config --enable CONFIG_KPM
-            config --enable CONFIG_KSU_TRACEPOINT_HOOK
-            config --enable CONFIG_HAVE_SYSCALL_TRACEPOINTS
-        elif [[ $KSU == "NEXT" ]]; then
-            patch -s -p1 --fuzz=3 --no-backup-if-mismatch <"$KERNEL_PATCHES/next/manual_hooks.patch"
-            config --disable CONFIG_KSU_KPROBES_HOOK
-        fi
 
         success "KernelSU added"
     fi
