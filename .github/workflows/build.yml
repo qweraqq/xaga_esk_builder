@@ -94,6 +94,15 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Fetch source code
+        uses: actions/checkout@v5
+        with:
+          repository: qweraqq/xaga-miui-kernel
+          path: kernel
+          submodules: recursive
+          token: ${{ secrets.PAT }}
+          ref: 19a7f682a8720afd109ad9a441f50907fd101004
+  
       - name: Install dependencies
         run: |
           sudo apt-get update -qq

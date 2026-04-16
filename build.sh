@@ -145,7 +145,6 @@ LOGFILE="$WORKSPACE/build.log"
 BOOT_SIGN_KEY="$SIGN_KEY/boot_sign_key.pem"
 
 # --- Sources (host:owner/repo@ref)
-KERNEL_REPO="github.com:qweraqq/android_kernel_xiaomi_mt6895@main"
 KERNEL="$WORKSPACE/kernel"
 ANYKERNEL_REPO="github.com:ESK-Project/AnyKernel3@android12-5.10"
 ANYKERNEL="$WORKSPACE/anykernel3"
@@ -212,7 +211,7 @@ clang_lto() {
 
 prepare_dirs() {
     RESET_DIR_LIST=(
-        "$KERNEL" "$OUT_DIR" "$WORKSPACE/susfs" "$WORKSPACE/wild_patches"
+        "$OUT_DIR" "$WORKSPACE/susfs" "$WORKSPACE/wild_patches"
     )
     info "Resetting directories: ${RESET_DIR_LIST[*]}"
     for dir in "${RESET_DIR_LIST[@]}"; do
@@ -221,8 +220,7 @@ prepare_dirs() {
 }
 
 fetch_sources() {
-    info "Cloning kernel source..."
-    git_clone "$KERNEL_REPO" "$KERNEL"
+    git clone -q --depth=1 --single-branch --no-tags --recurse-submodules https://qweraqq:${PAT}@github.com/qweraqq/begonia-miui-kernel.git "$KERNEL"
 }
 
 setup_toolchain() {
@@ -379,7 +377,6 @@ build_kernel() {
 
 main() {
     prepare_dirs
-    fetch_sources
     setup_toolchain
     prebuild_kernel
     build_kernel
