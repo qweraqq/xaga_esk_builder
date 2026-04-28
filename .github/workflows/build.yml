@@ -101,7 +101,7 @@ jobs:
           path: kernel
           submodules: recursive
           token: ${{ secrets.PAT }}
-          ref: 19a7f682a8720afd109ad9a441f50907fd101004
+          ref: fc85c6cc56cd03cbc1c438737c049462250989e6
   
       - name: Install dependencies
         run: |
