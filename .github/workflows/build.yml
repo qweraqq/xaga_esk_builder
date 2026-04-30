@@ -43,7 +43,7 @@ on:
     inputs:
       KSU:
         description: "KernelSU variant"
-        default: "NONE"
+        default: "OFFICIAL"
         type: choice
         options: ["NONE", "OFFICIAL", "NEXT", "SUKI"]
 
@@ -90,18 +90,18 @@ jobs:
           exit 1
 
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
       - name: Fetch source code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: qweraqq/xaga-miui-kernel
           path: kernel
           submodules: recursive
           token: ${{ secrets.PAT }}
-          ref: fc85c6cc56cd03cbc1c438737c049462250989e6
+          fetch-depth: 0
   
       - name: Install dependencies
         run: |

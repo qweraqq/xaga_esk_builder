@@ -70,7 +70,6 @@ parse_bool() {
 # Recreate directory
 reset_dir() {
     local path="$1"
-    [[ -d $path ]] && rm -rf -- "$path"
     mkdir -p -- "$path"
 }
 
